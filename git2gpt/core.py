@@ -1,20 +1,49 @@
+import io
+import json
 import os
+import string
 import subprocess
-import difflib
+import tarfile
 from typing import List, Dict, Any
-from git2gpt.git_to_json import git_archive_to_json
-import shutil
 
 
-def get_file_diff(original_content: str, mutated_content: str) -> List[str]:
-    original_lines = original_content.splitlines()
-    mutated_lines = mutated_content.splitlines()
-    diff = list(difflib.unified_diff(original_lines, mutated_lines))
-    return diff
+def is_binary_data(data : bytes) -> bool:
+    """Simple heuristic to check if data is binary."""
+    text_chars = bytearray({ord(c) for c in string.printable})
+    return bool(data.translate(None, text_chars))
 
+
+def get_snapshot(tar_stream : io.BytesIO) -> List[Dict[str, Any]]:
+    """Takes a tar stream and returns a list of dicts with the file name and content."""
+    snapshot = []
+    with tarfile.open(mode="r|*", fileobj=tar_stream) as tar:
+        for member in tar:
+            if not member.isfile():
+                continue
+
+            content = b""
+            extracted_file = tar.extractfile(member)
+            while True:
+                chunk = extracted_file.read(1024)
+                if not chunk:
+                    break
+                if is_binary_data(chunk):
+                    content = "<binary content>"
+                    break
+                content += chunk
+            if isinstance(content, bytes):
+                content = content.decode(errors="replace")
+            snapshot.append({
+                "name": member.name,
+                "content": content,
+            })
+    return snapshot
 
 def get_repo_snapshot(repo_path: str) -> str:
-    return git_archive_to_json(repo_path)
+    os.chdir(repo_path)
+    git_archive = subprocess.check_output(["git", "archive", "HEAD"])
+    tar_stream = io.BytesIO(git_archive)
+    return json.dumps(get_snapshot(tar_stream))
 
 
 def get_tracked_files(repo_path: str) -> List[str]:

@@ -7,7 +7,7 @@ import sys
 from typing import List, Dict, Any
 import git2gpt.models as models
 from git2gpt.models import get_response
-from git2gpt.core import apply_gpt_mutations, get_repo_snapshot, get_file_diff, get_tracked_files, commit_changes
+from git2gpt.core import apply_gpt_mutations, get_repo_snapshot, get_tracked_files, commit_changes
 
 
 def parse_mutations(suggestions: str) -> List[Dict[str, Any]]:
