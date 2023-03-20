@@ -1,8 +1,9 @@
 from setuptools import setup, find_packages
+from git2gpt.version import version
 
 setup(
     name='git2gpt',
-    version='0.1.6',
+    version=version,
     packages=find_packages(),
     install_requires=[
         'openai>=0.27.2',

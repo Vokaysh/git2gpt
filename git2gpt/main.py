@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 import git2gpt.models as models
 from git2gpt.models import get_response
 from git2gpt.core import apply_gpt_mutations, get_repo_snapshot, get_tracked_files, commit_changes
+from git2gpt.version import version
 
 
 def parse_mutations(suggestions: str) -> List[Dict[str, Any]]:
@@ -113,7 +114,16 @@ def main():
         default=0.7,
         help="Specify the temperature for GPT-4 suggestions (default: 0.7)",
     )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Display the current version of git2gpt",
+    )
     args = parser.parse_args()
+
+    if args.version:
+        print(f'git2gpt version {version}')
+        sys.exit(0)
 
     repo_path = args.repo
     prompt = args.prompt
