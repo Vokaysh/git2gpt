@@ -54,7 +54,7 @@ def get_response(messages, temperature=0.0, model="gpt-4"):
     model_config = model_data[model]
     prompt_tokens = count_tokens(messages, model)
     avail_tokens = model_config["window_size"] - prompt_tokens
-    print(f"Request {prompt_tokens} tokens, {avail_tokens} available for completion.")
+    print(f"Request {prompt_tokens} tokens, {avail_tokens} available for completion, {temperature=}.")
 
     start_time = time.time()
     response = openai.ChatCompletion.create(

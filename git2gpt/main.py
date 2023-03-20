@@ -111,7 +111,7 @@ def main():
     parser.add_argument(
         "-t", "--temperature",
         type=float,
-        default=0.7,
+        default=0.0,
         help="Specify the temperature for GPT-4 suggestions (default: 0.7)",
     )
     parser.add_argument(
