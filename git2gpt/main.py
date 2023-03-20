@@ -32,22 +32,29 @@ def interact_with_gpt(snapshot: str, prompt: str, question: bool = False, temper
     messages = [
         {
             "role": "system",
-            "content": f"You are an impressive and thorough software development assistant. You reply only in JSON. Here is a snapshot of a repository: {snapshot}",
+            "content": f"You are a state of the art software development assistant. Here is a snapshot of some source code that you will be assisting a user with: {snapshot}",
         },
-        {
+    ]
+    if question:
+        print(f'Asking the following question:\n{prompt}')
+        messages.append({
+            "role": "user",
+            "content": f"Please refer to the source code snapshot and answer the following: {prompt}",
+        })
+    else:
+        messages.append({
             "role": "system",
             "content": """Respond to the user's request with a list of mutations to apply to the repository, using the following JSON format.
 
 Each mutation in the list must include an action, a file_path, and a content (for insert and update operations). The action can be one of the following strings: 'add', 'modify', 'delete'.
 It is extremely important that you do not reply in any way but with an exact JSON string. Do not supply markup or any explanations outside of the code itself.
 """,
-        },
-        {
+        })
+        messages.append({
             "role": "user",
-            "content": f"Update the repostiory with the following changes: {prompt}" if not question else f"Answer these questions about the code: {prompt}"
-        },
-    ]
-    print(f'Using prompt: {prompt}')
+            "content": f"Please carefully and thoroughly make the following changes: {prompt}",
+        })
+        print(f'Requesting the following changes:\n{prompt}')
     return get_suggestions(messages, temperature=temperature)
 
 
