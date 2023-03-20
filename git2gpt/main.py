@@ -15,6 +15,7 @@ def parse_mutations(suggestions: str) -> List[Dict[str, Any]]:
         suggestions = suggestions[8:-3]  # strip the "```json\n" and "```"
     # gpt-4 seems to sometimes embed line feeds in json strings, which is illegal and breaks the parser.
     # this is a hack to avoid that by removing all linefeeds.
+    # TODO: there are still occasional failures here, parse them.
     suggestions = suggestions.replace("\n", " ")
     try:
         mutations = json.loads(suggestions)
@@ -52,7 +53,7 @@ def interact_with_gpt(snapshot: str, prompt: str, question: bool = False, temper
 A list of mutations. Each mutation in the list must include an action, a file_path, and a content (for insert and update operations). The action can be one of the following strings: 'add', 'modify', 'delete'.
 It is extremely important that you do not reply in any way but with an exact JSON string. Do not supply markup or any explanations outside of the code itself.
 
-In the case of an error you may respond with [{"error": "<your error message>"}] instead.
+In the case of an error you may respond with [{"error": "<your error message>"}] instead.  Never embed control characters in a JSON string.  If you do, the JSON parser will fail and you will be unable to respond to the user.
 """,
         })
         messages.append({
