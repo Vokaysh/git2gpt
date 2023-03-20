@@ -64,18 +64,19 @@ def get_response(messages, temperature=0.0, model="gpt-4"):
         messages=messages,
     )
     time_taken = time.time() - start_time
-    print(f'Request duration: {time_taken:.2f} seconds')
+    print(f"Request details:")
+    print(f"Duration  : {time_taken:.2f} seconds")
 
     prompt_tokens = response["usage"]["prompt_tokens"]
     prompt_cost = prompt_tokens * model_config["cost"]["prompt_tokens"]
-    print(f'{prompt_tokens:5d} prompt tokens used. Cost: ${prompt_cost:.6f}')
+    print(f"Prompt    : {prompt_tokens:5d} tokens, cost: ${prompt_cost:.6f}")
 
     completion_tokens = response["usage"]["completion_tokens"]
     completion_cost = completion_tokens * model_config["cost"]["completion_tokens"]
-    print(f'{completion_tokens:5d} completion tokens used. Cost: ${completion_cost:.6f}')
+    print(f"Completion: {completion_tokens:5d} tokens, cost: ${completion_cost:.6f}")
 
     total_tokens = response["usage"]["prompt_tokens"] + response["usage"]["completion_tokens"]
     total_cost = prompt_cost + completion_cost
-    print(f'{total_tokens:5d} tokens total. Total cost: ${total_cost:.6f}')
+    print(f"TOTAL     : {total_tokens:5d} tokens, cost: ${total_cost:.6f}")
 
     return response["choices"][0]["message"]["content"]
