@@ -10,7 +10,7 @@ from git2gpt.models import get_suggestions
 from git2gpt.core import apply_gpt_mutations, get_repo_snapshot, get_file_diff, get_tracked_files, commit_changes
 
 
-def extract_mutations(suggestions: str) -> List[Dict[str, Any]]:
+def parse_mutations(suggestions: str) -> List[Dict[str, Any]]:
     if suggestions.startswith("```"):
         suggestions = suggestions[8:-3]  # strip the "```json\n" and "```"
     # gpt-4 seems to sometimes embed line feeds in json strings, which is illegal and breaks the parser.
@@ -25,6 +25,9 @@ def extract_mutations(suggestions: str) -> List[Dict[str, Any]]:
             f.write(suggestions)
         print(f'Invalid suggestions saved to {tempfile} for debugging.')
         raise
+    if "error" in mutations[0]:
+        print(f"Error: {mutations[0]['error']}")
+        sys.exit(1)
     return mutations
 
 
@@ -46,8 +49,10 @@ def interact_with_gpt(snapshot: str, prompt: str, question: bool = False, temper
             "role": "system",
             "content": """Respond to the user's request with a list of mutations to apply to the repository, using the following JSON format.
 
-Each mutation in the list must include an action, a file_path, and a content (for insert and update operations). The action can be one of the following strings: 'add', 'modify', 'delete'.
+A list of mutations. Each mutation in the list must include an action, a file_path, and a content (for insert and update operations). The action can be one of the following strings: 'add', 'modify', 'delete'.
 It is extremely important that you do not reply in any way but with an exact JSON string. Do not supply markup or any explanations outside of the code itself.
+
+In the case of an error you may respond with [{"error": "<your error message>"}] instead.
 """,
         })
         messages.append({
@@ -132,27 +137,22 @@ def main():
         print('Error: Unstaged changes detected. Please commit or stash them before running this script. To force the operation, use -f/--force flag.')
         sys.exit(1)
 
-    try:
-        snapshot = get_repo_snapshot(repo_path)
-        suggestions = interact_with_gpt(snapshot, prompt, question=ask_question, temperature=temperature)
+    snapshot = get_repo_snapshot(repo_path)
+    output = interact_with_gpt(snapshot, prompt, question=ask_question, temperature=temperature)
 
-        if ask_question:
-            print(f'Answer: {suggestions}')
+    if ask_question:
+        print(f'Answer: {output}')
+    else:
+        mutations = parse_mutations(output)
+        apply_gpt_mutations(repo_path, mutations)
+        display_diff(repo_path)
+        decision = input("Do you want to keep the changes? (y/n): ")
+        if decision.lower() == 'y':
+            commit_changes(repo_path, f"git2gpt: {prompt}")
         else:
-            mutations = extract_mutations(suggestions)
-            apply_gpt_mutations(repo_path, mutations)
-            display_diff(repo_path)
-            decision = input("Do you want to keep the changes? (y/n): ")
-            if decision.lower() == 'y':
-                commit_changes(repo_path, f"git2gpt: {prompt}")
-            else:
-                print("No changes will be committed.")
-                print("To discard the changes, run the following git command:")
-                print("    git reset --hard HEAD")
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
+            print("No changes will be committed.")
+            print("To discard the changes, run the following git command:")
+            print("    git reset --hard HEAD")
 
 if __name__ == "__main__":
     main()
