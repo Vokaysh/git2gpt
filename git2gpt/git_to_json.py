@@ -53,33 +53,3 @@ def git_archive_to_json(repo_path):
     git_archive = subprocess.check_output(["git", "archive", "HEAD"])
     tar_stream = io.BytesIO(git_archive)
     return tar_to_json(tar_stream)
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Export git repository to JSON structure"
-    )
-    parser.add_argument(
-        "repo_path",
-        nargs="?",
-        default=".",
-        help="path to git repository (default: current directory)",
-    )
-    parser.add_argument(
-        "-o", "--output", metavar="OUTPUT", help="output file (default: stdout)"
-    )
-
-    args = parser.parse_args()
-
-    repo_path = os.path.abspath(args.repo_path)
-    json_structure = git_archive_to_json(repo_path)
-
-    if args.output:
-        with open(args.output, "w") as output_file:
-            output_file.write(json_structure)
-    else:
-        print(json_structure)
-
-
-if __name__ == "__main__":
-    main()
