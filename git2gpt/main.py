@@ -6,7 +6,7 @@ import subprocess
 import sys
 from typing import List, Dict, Any
 import git2gpt.models as models
-from git2gpt.models import get_suggestions
+from git2gpt.models import get_response
 from git2gpt.core import apply_gpt_mutations, get_repo_snapshot, get_file_diff, get_tracked_files, commit_changes
 
 
@@ -32,7 +32,7 @@ def parse_mutations(suggestions: str) -> List[Dict[str, Any]]:
     return mutations
 
 
-def interact_with_gpt(snapshot: str, prompt: str, question: bool = False, temperature: float = 0.0) -> str:
+def send_request(snapshot: str, prompt: str, question: bool = False, temperature: float = 0.0) -> str:
     messages = [
         {
             "role": "system",
@@ -61,7 +61,7 @@ In the case of an error you may respond with [{"error": "<your error message>"}]
             "content": f"Please carefully and thoroughly make the following changes: {prompt}",
         })
         print(f'Requesting the following changes:\n{prompt}')
-    return get_suggestions(messages, temperature=temperature)
+    return get_response(messages, temperature=temperature)
 
 
 def display_diff(repo_path: str) -> None:
@@ -139,7 +139,7 @@ def main():
         sys.exit(1)
 
     snapshot = get_repo_snapshot(repo_path)
-    output = interact_with_gpt(snapshot, prompt, question=ask_question, temperature=temperature)
+    output = send_request(snapshot, prompt, question=ask_question, temperature=temperature)
 
     if ask_question:
         print(f'Answer: {output}')

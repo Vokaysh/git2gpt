@@ -48,7 +48,7 @@ def count_tokens(messages, model):
     num_tokens += 2  # every reply is primed with <im_start>assistant
     return num_tokens
 
-def get_suggestions(messages, temperature=0.0, model="gpt-4"):
+def get_response(messages, temperature=0.0, model="gpt-4"):
     print(f'Model: {model}')
 
     model_config = model_data[model]
