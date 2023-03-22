@@ -13,21 +13,7 @@ model_data = {
             'prompt_tokens': 0.03 / 1000,
             'completion_tokens': 0.06 / 1000,
         },
-    },  
-    'gpt-4-32k': {
-        'window_size': 32768,
-        'cost': {
-            'prompt_tokens': 0.06 / 1000,
-            'completion_tokens': 0.012 / 1000,
-        },
     },
-    'gpt-3.5-turbo': {
-        'window_size': 4096,
-        'cost': {
-            'prompt_tokens': 0.002 / 1000,
-            'completion_tokens': 0.002 / 1000
-        },
-    }
 }
 
 # TODO: This seems to be overcounting by ~3 tokens at least with gpt-4.0
