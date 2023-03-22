@@ -1,37 +1,60 @@
 import argparse
-import difflib
 import json
-import os
 import subprocess
-import sys
+import time
 from typing import List, Dict, Any
 import git2gpt.models as models
 from git2gpt.models import get_response
 from git2gpt.core import apply_gpt_mutations, get_repo_snapshot, get_tracked_files, commit_changes
 from git2gpt.version import version
+import re
+from contextlib import contextmanager
+from pathlib import Path
+import os
+import sys
+import tempfile
+import logging
+import datetime
 
 
-def parse_mutations(suggestions: str) -> List[Dict[str, Any]]:
-    if suggestions.startswith("```"):
-        suggestions = suggestions[8:-3]  # strip the "```json\n" and "```"
-    # gpt-4 seems to sometimes embed line feeds in json strings, which is illegal and breaks the parser.
-    # this is a hack to avoid that by removing all linefeeds.
-    # TODO: there are still occasional failures here, parse them.
-    suggestions = suggestions.replace("\n", " ")
+@contextmanager
+def change_directory(path: str):
+    original_path = Path.cwd()
+    os.chdir(path)
     try:
-        mutations = json.loads(suggestions)
+        yield
+    finally:
+        os.chdir(original_path)
+
+def get_user_decision(prompt: str, valid_choices: List[str]) -> str:
+    while True:
+        decision = input(prompt).lower()
+        if decision in valid_choices:
+            return decision
+        else:
+            print(f"Invalid choice. Please enter one of the following: {', '.join(valid_choices)}")
+
+def parse_json(json_string: str) -> Any:
+    try:
+        return json.loads(json_string)
     except json.JSONDecodeError as e:
         print(f"Failed to parse JSON: {e}")
         tempfile = 'error_log.json'
         with open(tempfile, 'w') as f:
-            f.write(suggestions)
-        print(f'Invalid suggestions saved to {tempfile} for debugging.')
+            f.write(json_string)
+        print(f"Invalid suggestions saved to {tempfile} for debugging.")
         raise
+
+def parse_mutations(suggestions: str) -> List[Dict[str, Any]]:
+    if suggestions.startswith("```"):
+        suggestions = suggestions[8:-3]  # strip the "```json\n" and "```"
+    suggestions = suggestions.replace("\n", " ")
+    suggestions = re.sub(r'\\([^"\\/bfnrt])', r'\1', suggestions)
+    mutations = parse_json(suggestions)
     if "error" in mutations[0]:
         print(f"Error: {mutations[0]['error']}")
         sys.exit(1)
     return mutations
-
 
 def send_request(snapshot: str, prompt: str, question: bool = False, temperature: float = 0.0) -> str:
     messages = [
@@ -62,21 +85,28 @@ In the case of an error you may respond with [{"error": "<your error message>"}]
             "content": f"Please carefully and thoroughly make the following changes: {prompt}",
         })
         print(f'Requesting the following changes:\n{prompt}')
-    return get_response(messages, temperature=temperature)
-
+    start_time = time.time()
+    response = get_response(messages, temperature=temperature)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logging.info(f"WebAPI request took {elapsed_time:.2f} seconds")
+    return response, elapsed_time
 
 def display_diff(repo_path: str) -> None:
     tracked_files = get_tracked_files(repo_path)
-    os.chdir(repo_path)
-    for file in tracked_files:
-        os.system(f'git diff --staged -- {file}')
-
+    with change_directory(repo_path):
+        for file in tracked_files:
+            subprocess.run(["git", "diff", "--staged", "--", file])
 
 def check_unstaged_changes(repo_path: str) -> bool:
-    os.chdir(repo_path)
-    result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+    with change_directory(repo_path):
+        result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
     return bool(result.stdout.strip())
 
+def setup_logging():
+    log_filename = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S.log")
+    logging.basicConfig(filename=log_filename, level=logging.INFO, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    print(f"Logging webapi requests and responses to {log_filename}")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -130,16 +160,7 @@ def main():
     ask_question = args.ask
     force = args.force
     temperature = args.temperature
-
-    if args.editor:
-        import tempfile
-        import subprocess
-        editor = os.environ.get('EDITOR', 'vim')
-        with tempfile.NamedTemporaryFile(suffix='.txt') as tmp:
-            subprocess.call([editor, tmp.name])
-            tmp.seek(0)
-            prompt = tmp.read().decode('utf-8').strip()
-
+    
     if not prompt:
         print('Error: No prompt provided. Please provide a prompt using --prompt or --editor.')
         sys.exit(1)
@@ -148,8 +169,11 @@ def main():
         print('Error: Unstaged changes detected. Please commit or stash them before running this script. To force the operation, use -f/--force flag.')
         sys.exit(1)
 
+    setup_logging()
+
+    start_time = time.time()
     snapshot = get_repo_snapshot(repo_path)
-    output = send_request(snapshot, prompt, question=ask_question, temperature=temperature)
+    output, api_time = send_request(snapshot, prompt, question=ask_question, temperature=temperature)
 
     if ask_question:
         print(f'Answer: {output}')
@@ -157,13 +181,19 @@ def main():
         mutations = parse_mutations(output)
         apply_gpt_mutations(repo_path, mutations)
         display_diff(repo_path)
-        decision = input("Do you want to keep the changes? (y/n): ")
+        decision = get_user_decision("Do you want to keep the changes? (y/n): ", ['y', 'n'])
         if decision.lower() == 'y':
             commit_changes(repo_path, f"git2gpt: {prompt}")
         else:
             print("No changes will be committed.")
             print("To discard the changes, run the following git command:")
             print("    git reset --hard HEAD")
+
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"\nExecution time statistics:")
+    print(f"  WebAPI request: {api_time:.2f} seconds")
+    print(f"  Total execution time: {total_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()

@@ -79,7 +79,6 @@ def apply_gpt_mutations(repo_path: str, mutations: List[Dict[str, Any]]) -> None
                         f"Error while trying to remove the directory {file_path}: {e}"
                     )
 
-
 def commit_changes(repo_path: str, commit_message: str) -> None:
     os.chdir(repo_path)
     subprocess.run(["git", "add", "."])
